@@ -8,6 +8,7 @@ interface JsonLine {
   id: number;
   raw: string;
   parsed: unknown | null;
+  size: number;
   error?: string;
 }
 
@@ -20,6 +21,15 @@ interface FileData {
 }
 
 type ViewTab = 'raw' | 'pretty' | 'tree';
+
+// Format byte size
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
 
 // Unescape string - convert escape sequences to actual characters
 function unescapeString(str: string): string {
@@ -573,13 +583,15 @@ export default function Home() {
 
   // Parse JSONL content
   const parseJsonl = useCallback((content: string): JsonLine[] => {
+    const encoder = new TextEncoder();
     const rawLines = content.split('\n').filter(line => line.trim());
     return rawLines.map((raw, index) => {
+      const size = encoder.encode(raw).length;
       try {
         const parsed = JSON.parse(raw);
-        return { id: index + 1, raw, parsed };
+        return { id: index + 1, raw, parsed, size };
       } catch {
-        return { id: index + 1, raw, parsed: null, error: 'Invalid JSON' };
+        return { id: index + 1, raw, parsed: null, error: 'Invalid JSON', size };
       }
     });
   }, []);
@@ -765,6 +777,7 @@ export default function Home() {
         <span className={`${styles.listItemContent} mono`}>
           {line.raw.length > 200 ? line.raw.substring(0, 200) + '...' : line.raw}
         </span>
+        <span className={styles.listItemSize}>{formatBytes(line.size)}</span>
       </div>
     );
   }, [displayLines, selectedId]);
