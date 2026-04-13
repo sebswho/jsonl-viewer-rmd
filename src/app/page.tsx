@@ -519,7 +519,18 @@ export default function Home() {
   const listRef = useRef<List>(null);
   const detailContentRef = useRef<HTMLDivElement>(null);
 
+  // Line-size visibility toggle (persisted to localStorage)
+  const STORAGE_KEY = 'jsonlViewer.showLineSize';
 
+  const [showLineSize, setShowLineSize] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, String(showLineSize));
+  }, [showLineSize]);
 
   // Copy to clipboard
   const handleCopy = useCallback(async (text: string) => {
@@ -766,7 +777,7 @@ export default function Home() {
   const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
     const line = displayLines[index];
     const isSelected = selectedId === line.id;
-    
+
     return (
       <div
         style={style}
@@ -777,10 +788,12 @@ export default function Home() {
         <span className={`${styles.listItemContent} mono`}>
           {line.raw.length > 200 ? line.raw.substring(0, 200) + '...' : line.raw}
         </span>
-        <span className={styles.listItemSize}>{formatBytes(line.size)}</span>
+        {showLineSize && (
+          <span className={styles.listItemSize}>{formatBytes(line.size)}</span>
+        )}
       </div>
     );
-  }, [displayLines, selectedId]);
+  }, [displayLines, selectedId, showLineSize]);
 
   // Global drag/drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -842,9 +855,24 @@ export default function Home() {
               style={{ display: 'none' }}
             />
           </label>
-          <a 
-            href="https://github.com/Sylinko/jsonl-viewer" 
-            target="_blank" 
+          {/* Global toggle: Show line size */}
+          <button
+            className={styles.lineSizeToggle}
+            onClick={() => setShowLineSize(prev => !prev)}
+            title={showLineSize ? 'Hide Line Sizes' : 'Show Line Sizes'}
+            aria-pressed={showLineSize}
+          >
+            <span className={styles.lineSizeToggleLabel}>Show Line Size</span>
+            <span
+              className={`${styles.lineSizeToggleTrack} ${showLineSize ? styles.lineSizeToggleTrackOn : ''}`}
+            >
+              <span className={styles.lineSizeToggleThumb} />
+            </span>
+          </button>
+
+          <a
+            href="https://github.com/Sylinko/jsonl-viewer"
+            target="_blank"
             rel="noopener noreferrer"
             className={styles.githubLink}
             title="View on GitHub"
