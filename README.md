@@ -4,13 +4,16 @@ A high-performance JSONL file viewer built with Next.js, optimized for log analy
 
 ## Features
 
-- **PWA Support** - Install as a native app on any device
-- **Drag & Drop** - Simply drag a `.jsonl` file to open
-- **Fast Filtering** - Text-based search across all JSON objects
-- **Virtual Scrolling** - Handle large files with thousands of lines efficiently
-- **Dual View Modes** - Switch between raw and pretty-formatted JSON
-- **Sort Controls** - Toggle between ascending/descending order
-- **Dark Theme** - Easy on the eyes for extended log analysis
+- **PWA Support** — Install as a native app on any device
+- **Drag & Drop** — Simply drag `.jsonl` files onto the page to open
+- **Multi-Tab** — Open multiple files in tabs, switch between them freely
+- **Virtual Scrolling** — Handle large files with thousands of lines efficiently via react-window
+- **Three View Modes**
+  - **Pretty** — JSON syntax highlighting with color-coded keys, strings, numbers, booleans, and nulls
+  - **Raw** — Original unformatted JSON line
+  - **Tree** — Interactive tree explorer with expand/collapse, path selection, and value panel
+- **Keyboard Navigation** — Arrow Up/Down to navigate objects, Ctrl+A to select content
+- **Line Size Display** — Toggleable per-line byte size indicator (persisted via localStorage)
 
 ## Getting Started
 
@@ -19,31 +22,35 @@ A high-performance JSONL file viewer built with Next.js, optimized for log analy
 pnpm install
 
 # Run development server
-pnpm run dev
+pnpm dev
 
 # Build for production
-pnpm run build
+pnpm build
 
 # Start production server
-pnpm run start
+pnpm start
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to use the viewer.
 
 ## Usage
 
-1. Drag and drop a `.jsonl` file onto the drop zone (or click "Browse Files")
-2. Use the search bar to filter objects by text content
-3. Click any object in the left list to view details
-4. Switch between "Pretty" and "Raw" tabs to see formatted or original JSON
-5. Use the sort button to toggle ascending/descending order
+1. Drag and drop a `.jsonl` file onto the drop zone (or click **Browse Files**)
+2. Use the filter bar to search objects by text content
+3. Click any object in the left list to view its details
+4. Switch between **Pretty**, **Raw**, and **Tree** tabs
+5. In Tree view, click nodes to expand/collapse and inspect values in the right panel
+6. Use ↑/↓ arrow keys to navigate between objects
+7. Use the sort button to toggle ascending/descending order
 
 ## Tech Stack
 
-- **Next.js 14** - React framework with App Router
-- **react-window** - Virtualized list for performance
-- **next-pwa** - Progressive Web App support
-- **TypeScript** - Type safety
+- **Next.js 16** — React framework with App Router and Turbopack
+- **React 19** — UI library
+- **react-window 2** — Virtualized list for high-performance rendering
+- **next-pwa** — Progressive Web App support
+- **TypeScript 6** — Type safety
+- **pnpm** — Package manager
 
 ## License
 

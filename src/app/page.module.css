@@ -877,6 +877,7 @@
   cursor: pointer;
   transition: all 0.15s ease;
   flex-shrink: 0;
+  -webkit-user-select: none;
   user-select: none;
 }
 
