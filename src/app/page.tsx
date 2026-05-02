@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { FixedSizeList as List } from 'react-window';
+import { List, type ListImperativeAPI } from 'react-window';
 import styles from './page.module.css';
 
 interface JsonLine {
@@ -108,7 +108,7 @@ function TreeNode({ keyName, value, depth, path, selectedPath, onSelect, expande
         </span>
       </div>
       {isExpandable && isExpanded && (
-        <div className={styles.treeChildren}>
+        <div>
           {Array.isArray(value) ? (
             value.map((item, index) => (
               <TreeNode
@@ -506,7 +506,7 @@ export default function Home() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [listHeight, setListHeight] = useState(400);
   const [treePath, setTreePath] = useState<string | null>(null);
-  const listRef = useRef<List>(null);
+  const listRef = useRef<ListImperativeAPI>(null);
   const detailContentRef = useRef<HTMLDivElement>(null);
 
 
@@ -698,7 +698,7 @@ export default function Home() {
     if (newIndex !== -1 && newIndex !== currentIndex) {
       setSelectedId(displayLines[newIndex].id);
       if (listRef.current) {
-        listRef.current.scrollToItem(newIndex);
+        listRef.current.scrollToRow({ index: newIndex });
       }
     }
   }, [displayLines, selectedId]);
@@ -750,8 +750,8 @@ export default function Home() {
     }
   }, []);
 
-  // Row renderer for virtualized list
-  const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
+  // Row component for virtualized list (react-window v2 API)
+  const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties; ariaAttributes: { 'aria-posinset': number; 'aria-setsize': number; role: 'listitem' } }) => {
     const line = displayLines[index];
     const isSelected = selectedId === line.id;
     
@@ -944,15 +944,14 @@ export default function Home() {
               </div>
               <div className={styles.listContainer} ref={containerRef}>
                 <List
-                  ref={listRef}
-                  height={listHeight}
-                  itemCount={displayLines.length}
-                  itemSize={36}
-                  width="100%"
+                  listRef={listRef}
+                  style={{ height: listHeight }}
+                  rowCount={displayLines.length}
+                  rowHeight={36}
+                  rowComponent={Row}
+                  rowProps={{}}
                   overscanCount={10}
-                >
-                  {Row}
-                </List>
+                />
               </div>
             </div>
 
