@@ -360,10 +360,25 @@
 .leftPanel {
   display: flex;
   flex-direction: column;
-  width: 45%;
-  min-width: 300px;
-  max-width: 600px;
-  border-right: 1px solid var(--border-color);
+  width: 30%;
+  min-width: 350px;
+  max-width: 50%;
+  flex-shrink: 0;
+}
+
+/* Resizer handle */
+.resizer {
+  width: 5px;
+  cursor: col-resize;
+  background: var(--border-color);
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+  position: relative;
+}
+
+.resizer:hover,
+.resizer:active {
+  background: var(--accent-color);
 }
 
 .panelHeader {

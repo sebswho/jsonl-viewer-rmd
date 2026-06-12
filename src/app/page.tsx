@@ -558,6 +558,44 @@ export default function Home() {
   const listRef = useRef<ListImperativeAPI>(null);
   const detailContentRef = useRef<HTMLDivElement>(null);
 
+  // Left panel resizable width (px)
+  const [leftPanelWidth, setLeftPanelWidth] = useState<number | null>(null);
+  const isResizing = useRef(false);
+  const splitViewRef = useRef<HTMLDivElement>(null);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  useEffect(() => {
+    const handleResizeMove = (e: MouseEvent) => {
+      if (!isResizing.current || !splitViewRef.current) return;
+      const rect = splitViewRef.current.getBoundingClientRect();
+      const newWidth = e.clientX - rect.left;
+      const minW = 250;
+      const maxW = rect.width * 0.5;
+      setLeftPanelWidth(Math.max(minW, Math.min(maxW, newWidth)));
+    };
+
+    const handleResizeEnd = () => {
+      if (isResizing.current) {
+        isResizing.current = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    };
+
+    window.addEventListener("mousemove", handleResizeMove);
+    window.addEventListener("mouseup", handleResizeEnd);
+    return () => {
+      window.removeEventListener("mousemove", handleResizeMove);
+      window.removeEventListener("mouseup", handleResizeEnd);
+    };
+  }, []);
+
   // Line-size visibility toggle (persisted to localStorage)
   const STORAGE_KEY = "jsonlViewer.showLineSize";
 
@@ -1051,9 +1089,12 @@ export default function Home() {
           </div>
         ) : (
           /* Split View */
-          <div className={styles.splitView}>
+          <div className={styles.splitView} ref={splitViewRef}>
             {/* Left Panel - List */}
-            <div className={styles.leftPanel}>
+            <div
+              className={styles.leftPanel}
+              style={leftPanelWidth !== null ? { width: leftPanelWidth } : undefined}
+            >
               <div className={styles.panelHeader}>
                 <span>Objects</span>
                 <div className={styles.leftPanelControls}>
@@ -1105,6 +1146,12 @@ export default function Home() {
                 />
               </div>
             </div>
+
+            {/* Resizer handle */}
+            <div
+              className={styles.resizer}
+              onMouseDown={handleResizeStart}
+            />
 
             {/* Right Panel - Detail */}
             <div className={styles.rightPanel}>
