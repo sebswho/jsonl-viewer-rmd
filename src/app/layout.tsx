@@ -1,20 +1,20 @@
-import type { Metadata, Viewport } from 'next';
-import './globals.css';
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'JSONL Viewer',
-  description: 'A high-performance JSONL file viewer for logs',
-  manifest: '/manifest.json',
+  title: "JSON 查看器",
+  description: "用于查看 JSON 与 JSONL 文件的本地高性能查看器",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'JSONL Viewer',
+    statusBarStyle: "black-translucent",
+    title: "JSON 查看器",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0a0a0a',
-  width: 'device-width',
+  themeColor: "#0a0a0a",
+  width: "device-width",
   initialScale: 1,
   maximumScale: 1,
 };
@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="zh-CN">
       <head>
         <link rel="icon" href="/icon-192x192.svg" type="image/svg+xml" />
       </head>
