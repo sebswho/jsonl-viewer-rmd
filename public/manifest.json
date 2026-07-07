@@ -1,7 +1,7 @@
 {
-  "name": "JSONL Viewer",
-  "short_name": "JSONL",
-  "description": "A high-performance JSONL file viewer for logs",
+  "name": "JSON 查看器",
+  "short_name": "JSON",
+  "description": "用于查看 JSON 与 JSONL 文件的本地高性能查看器",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0a",
