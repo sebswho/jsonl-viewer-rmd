@@ -37,6 +37,8 @@ import {
 } from "@/lib/session-store";
 
 const FILE_ACCEPT = ".jsonl,.json,.log,.txt";
+const TEMP_IMPORT_FALLBACK_NOTICE =
+  "当前访问方式将以临时导入打开本地文件，刷新后不会自动恢复。";
 
 type FilePickerWindow = Window & {
   showOpenFilePicker?: (options?: {
@@ -679,10 +681,25 @@ export default function Home() {
     [appendOpenedFiles, showNotice],
   );
 
+  const openTemporaryFileDialog = useCallback(
+    (showFallbackNotice: boolean = false) => {
+      if (!fileInputRef.current) {
+        showNotice("error", "文件导入入口初始化失败，请刷新页面后重试。");
+        return;
+      }
+
+      if (showFallbackNotice) {
+        showNotice("info", TEMP_IMPORT_FALLBACK_NOTICE);
+      }
+
+      fileInputRef.current.click();
+    },
+    [showNotice],
+  );
+
   const openPickerFiles = useCallback(async () => {
     const pickerWindow = window as FilePickerWindow;
     if (!pickerWindow.showOpenFilePicker) {
-      showNotice("error", "当前浏览器不支持原生文件恢复，请使用 Chromium 浏览器。");
       return;
     }
 
@@ -722,9 +739,27 @@ export default function Home() {
       ) {
         return;
       }
+      if (
+        error instanceof DOMException &&
+        error.name === "SecurityError"
+      ) {
+        openTemporaryFileDialog(true);
+        return;
+      }
       showNotice("error", "打开文件失败，请重试。");
     }
-  }, [appendOpenedFiles, showNotice]);
+  }, [appendOpenedFiles, openTemporaryFileDialog, showNotice]);
+
+  const openFiles = useCallback(() => {
+    const pickerWindow = window as FilePickerWindow;
+
+    if (!pickerWindow.showOpenFilePicker) {
+      openTemporaryFileDialog(true);
+      return;
+    }
+
+    void openPickerFiles();
+  }, [openPickerFiles, openTemporaryFileDialog]);
 
   const handleFileInput = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1081,7 +1116,7 @@ export default function Home() {
         </div>
 
         <div className={styles.headerRight}>
-          <button className={styles.addFileBtn} onClick={() => void openPickerFiles()}>
+          <button className={styles.addFileBtn} onClick={openFiles}>
             <FolderOpen size={16} />
             打开文件
           </button>
@@ -1223,7 +1258,7 @@ export default function Home() {
               <p className={styles.dropText}>拖放 .json 或 .jsonl 文件到这里</p>
               <p className={styles.dropSubtext}>或</p>
               <div className={styles.emptyActions}>
-                <button className={styles.browseBtn} onClick={() => void openPickerFiles()}>
+                <button className={styles.browseBtn} onClick={openFiles}>
                   打开文件
                 </button>
                 <label className={styles.secondaryActionBtn}>
