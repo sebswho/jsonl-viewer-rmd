@@ -1092,3 +1092,163 @@
     height: 60%;
   }
 }
+
+/* Context Menu */
+.contextMenuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+}
+
+.contextMenu {
+  position: fixed;
+  z-index: 1051;
+  min-width: 140px;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.contextMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  text-align: left;
+  transition: all 0.1s ease;
+}
+
+.contextMenuItem:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Record Editor */
+.editor {
+  width: 100%;
+  min-height: 320px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.editorValid {
+  border-color: var(--success-color);
+}
+
+.editorInvalid {
+  border-color: var(--error-color);
+}
+
+.editorError {
+  margin-top: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.12);
+  border-radius: 4px;
+  word-break: break-word;
+}
+
+/* Modified badge */
+.fileTabStatusDirty {
+  color: #fcd34d; /* amber-300 */
+  background: rgba(252, 211, 77, 0.16);
+}
+
+/* Confirm Modal */
+.confirmOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 10, 0.7);
+}
+
+.confirmCard {
+  width: 90%;
+  max-width: 420px;
+  padding: 20px 24px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.confirmCardDanger {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: var(--error-color);
+}
+
+.confirmHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: var(--error-color);
+}
+
+.confirmTitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.confirmText {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirmCancel {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.confirmCancel:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.confirmDanger {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--error-color);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.confirmDanger:hover {
+  opacity: 0.9;
+}
