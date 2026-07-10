@@ -1664,7 +1664,9 @@ export default function Home() {
                       </button>
                     </div>
                   </div>
-                  <div className={styles.detailContent}>
+                  <div
+                    className={`${styles.detailContent} ${styles.editorContent}`}
+                  >
                     <textarea
                       className={`${styles.editor} ${editIsInvalid ? styles.editorInvalid : styles.editorValid} mono`}
                       value={editText}

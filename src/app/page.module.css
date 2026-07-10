@@ -1130,9 +1130,17 @@
 }
 
 /* Record Editor */
+.editorContent {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .editor {
+  flex: 1;
   width: 100%;
-  min-height: 320px;
+  min-height: 0;
   padding: 12px;
   font-size: 13px;
   line-height: 1.6;
@@ -1140,7 +1148,7 @@
   background: var(--bg-primary);
   border: 2px solid var(--border-color);
   border-radius: 6px;
-  resize: vertical;
+  resize: none;
   outline: none;
   transition: border-color 0.15s ease;
 }
