@@ -13,17 +13,22 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  Download,
   File,
   FileUp,
   FolderOpen,
   ListChevronsDownUp,
   ListChevronsUpDown,
+  Pencil,
+  Save,
   Search,
   Trash2,
   X,
 } from "lucide-react";
 import {
   parseViewerFile,
+  reparseRecord,
+  serializeViewerFile,
   ViewerFileParseError,
   type ViewerFile,
   type ViewerFileSource,
@@ -48,6 +53,16 @@ type FilePickerWindow = Window & {
       accept: Record<string, string[]>;
     }>;
   }) => Promise<FileSystemFileHandle[]>;
+};
+
+type FileSavePickerWindow = Window & {
+  showSaveFilePicker?: (options?: {
+    suggestedName?: string;
+    types?: Array<{
+      description?: string;
+      accept: Record<string, string[]>;
+    }>;
+  }) => Promise<FileSystemFileHandle>;
 };
 
 interface Notice {
@@ -598,6 +613,17 @@ export default function Home() {
   const [treePath, setTreePath] = useState<string | null>(null);
   const [leftPanelWidth, setLeftPanelWidth] = useState<number | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    recordId: number;
+  } | null>(null);
+  const [editing, setEditing] = useState<{ recordId: number } | null>(null);
+  const [editText, setEditText] = useState("");
+  const [confirm, setConfirm] = useState<{
+    kind: "overwrite" | "delete";
+    recordId?: number;
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const splitViewRef = useRef<HTMLDivElement>(null);
   const detailContentRef = useRef<HTMLDivElement>(null);
@@ -643,6 +669,20 @@ export default function Home() {
     if (selectedId === null) return null;
     return lines.find((line) => line.id === selectedId) ?? null;
   }, [lines, selectedId]);
+
+  const editingRecord = useMemo(
+    () =>
+      editing
+        ? (lines.find((line) => line.id === editing.recordId) ?? null)
+        : null,
+    [editing, lines],
+  );
+
+  const editValidation = useMemo(
+    () => (editing ? reparseRecord(editText) : null),
+    [editing, editText],
+  );
+  const editIsInvalid = editValidation?.error !== undefined;
 
   const isAtFirst = currentIndex <= 0;
   const isAtLast =
@@ -936,11 +976,19 @@ export default function Home() {
       }
 
       if (event.key === "ArrowDown") {
-        if (document.activeElement instanceof HTMLInputElement) return;
+        if (
+          document.activeElement instanceof HTMLInputElement ||
+          document.activeElement instanceof HTMLTextAreaElement
+        )
+          return;
         event.preventDefault();
         navigateSelection("down");
       } else if (event.key === "ArrowUp") {
-        if (document.activeElement instanceof HTMLInputElement) return;
+        if (
+          document.activeElement instanceof HTMLInputElement ||
+          document.activeElement instanceof HTMLTextAreaElement
+        )
+          return;
         event.preventDefault();
         navigateSelection("up");
       }
@@ -1091,6 +1139,190 @@ export default function Home() {
     [openEphemeralFiles],
   );
 
+  const markClean = useCallback(() => {
+    if (!activeFileId) return;
+    setFiles((previous) =>
+      previous.map((file) =>
+        file.id === activeFileId ? { ...file, isDirty: false } : file,
+      ),
+    );
+  }, [activeFileId]);
+
+  const handleSaveAs = useCallback(async () => {
+    if (!activeFile) return;
+    const content = serializeViewerFile(activeFile);
+    const saveWindow = window as FileSavePickerWindow;
+
+    if (saveWindow.showSaveFilePicker) {
+      try {
+        const handle = await saveWindow.showSaveFilePicker({
+          suggestedName: activeFile.name,
+          types: [
+            {
+              description: "JSON 数据文件",
+              accept: {
+                "application/json": [".json", ".jsonl"],
+                "text/plain": [".log", ".txt"],
+              },
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(content);
+        await writable.close();
+        markClean();
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        showNotice("error", "另存为失败，请重试。");
+        return;
+      }
+    }
+
+    const blob = new Blob([content], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = activeFile.name;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+    markClean();
+  }, [activeFile, markClean, showNotice]);
+
+  const doOverwrite = useCallback(async () => {
+    if (!activeFile?.handle) return;
+    const content = serializeViewerFile(activeFile);
+    try {
+      const writable = await activeFile.handle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      markClean();
+    } catch {
+      showNotice("error", "覆盖保存失败，请重试。");
+    }
+  }, [activeFile, markClean, showNotice]);
+
+  const updateRecord = useCallback(
+    (recordId: number, nextParsed: unknown) => {
+      if (!activeFileId) return;
+      const raw = JSON.stringify(nextParsed);
+      const size = new TextEncoder().encode(raw).length;
+      setFiles((previous) =>
+        previous.map((file) =>
+          file.id === activeFileId
+            ? {
+                ...file,
+                isDirty: true,
+                lines: file.lines.map((line) =>
+                  line.id === recordId
+                    ? {
+                        ...line,
+                        raw,
+                        parsed: nextParsed,
+                        size,
+                        error: undefined,
+                      }
+                    : line,
+                ),
+              }
+            : file,
+        ),
+      );
+    },
+    [activeFileId],
+  );
+
+  const deleteRecord = useCallback(
+    (recordId: number) => {
+      if (!activeFileId) return;
+      setFiles((previous) =>
+        previous.map((file) => {
+          if (file.id !== activeFileId) return file;
+          const remaining = file.lines
+            .filter((line) => line.id !== recordId)
+            .map((line, index) => ({ ...line, id: index + 1 }));
+          return { ...file, isDirty: true, lines: remaining };
+        }),
+      );
+      setSelectedId((current) => {
+        if (current === null || current < recordId) return current;
+        if (current === recordId) return null;
+        return current - 1;
+      });
+    },
+    [activeFileId],
+  );
+
+  const startEdit = useCallback(
+    (recordId: number) => {
+      setContextMenu(null);
+      setSelectedId(recordId);
+      const record = lines.find((line) => line.id === recordId);
+      setEditText(
+        record ? (record.error ? record.raw : formatJson(record.parsed)) : "",
+      );
+      setEditing({ recordId });
+    },
+    [lines],
+  );
+
+  const cancelEdit = useCallback(() => {
+    setEditing(null);
+    setEditText("");
+  }, []);
+
+  const commitEdit = useCallback(() => {
+    if (!editing || !editValidation || editValidation.error !== undefined) {
+      return;
+    }
+    updateRecord(editing.recordId, editValidation.parsed);
+    cancelEdit();
+  }, [editing, editValidation, updateRecord, cancelEdit]);
+
+  const requestDelete = useCallback((recordId: number) => {
+    setContextMenu(null);
+    setConfirm({ kind: "delete", recordId });
+  }, []);
+
+  const requestOverwrite = useCallback(() => {
+    if (!activeFile?.handle) return;
+    setConfirm({ kind: "overwrite" });
+  }, [activeFile]);
+
+  const confirmAction = useCallback(() => {
+    if (!confirm) return;
+    if (confirm.kind === "delete" && confirm.recordId !== undefined) {
+      deleteRecord(confirm.recordId);
+    } else if (confirm.kind === "overwrite") {
+      void doOverwrite();
+    }
+    setConfirm(null);
+  }, [confirm, deleteRecord, doOverwrite]);
+
+  const handleRowContextMenu = useCallback(
+    (event: React.MouseEvent, recordId: number) => {
+      event.preventDefault();
+      setSelectedId(recordId);
+      setContextMenu({ x: event.clientX, y: event.clientY, recordId });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (contextMenu) setContextMenu(null);
+      else if (confirm) setConfirm(null);
+      else if (editing) cancelEdit();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [contextMenu, confirm, editing, cancelEdit]);
+
   return (
     <main
       className={styles.main}
@@ -1133,6 +1365,32 @@ export default function Home() {
               style={{ display: "none" }}
             />
           </label>
+
+          {files.length > 0 && (
+            <>
+              <button
+                className={styles.addFileBtn}
+                onClick={() => void handleSaveAs()}
+                title="另存为新文件"
+              >
+                <Download size={16} />
+                另存为
+              </button>
+              <button
+                className={`${styles.addFileBtn} ${!activeFile?.handle ? styles.disabledBtn : ""}`}
+                onClick={requestOverwrite}
+                disabled={!activeFile?.handle}
+                title={
+                  activeFile?.handle
+                    ? "保存覆盖原文件"
+                    : "临时文件无法覆盖原文件"
+                }
+              >
+                <Save size={16} />
+                保存
+              </button>
+            </>
+          )}
 
           <button
             className={styles.lineSizeToggle}
@@ -1222,6 +1480,13 @@ export default function Home() {
               <span className={styles.fileTabName}>{file.name}</span>
               <div className={styles.fileTabMeta}>
                 <span className={styles.fileTabCount}>{file.lines.length}</span>
+                {file.isDirty && (
+                  <span
+                    className={`${styles.fileTabStatus} ${styles.fileTabStatusDirty}`}
+                  >
+                    已修改
+                  </span>
+                )}
                 {file.isRestored ? (
                   <span className={`${styles.fileTabStatus} ${styles.fileTabStatusRestored}`}>
                     已恢复
@@ -1348,7 +1613,15 @@ export default function Home() {
                       <div
                         style={style}
                         className={`${styles.listItem} ${isSelected ? styles.listItemSelected : ""} ${line.error ? styles.listItemError : ""}`}
-                        onClick={() => setSelectedId(line.id)}
+                        onClick={() => {
+                          if (editing && editing.recordId !== line.id) {
+                            cancelEdit();
+                          }
+                          setSelectedId(line.id);
+                        }}
+                        onContextMenu={(event) =>
+                          handleRowContextMenu(event, line.id)
+                        }
                       >
                         <span className={styles.listItemId}>{line.id}</span>
                         <span className={`${styles.listItemContent} mono`}>
@@ -1373,7 +1646,40 @@ export default function Home() {
             <div className={styles.resizer} onMouseDown={handleResizeStart} />
 
             <div className={styles.rightPanel}>
-              {selectedLine ? (
+              {editing && editingRecord ? (
+                <>
+                  <div className={styles.panelHeader}>
+                    <span>编辑记录 #{editingRecord.id}</span>
+                    <div className={styles.headerRight}>
+                      <button className={styles.copyBtn} onClick={cancelEdit}>
+                        取消
+                      </button>
+                      <button
+                        className={`${styles.copyBtn} ${editIsInvalid ? styles.disabledBtn : ""}`}
+                        onClick={commitEdit}
+                        disabled={editIsInvalid}
+                      >
+                        <Check size={14} />
+                        保存修改
+                      </button>
+                    </div>
+                  </div>
+                  <div className={styles.detailContent}>
+                    <textarea
+                      className={`${styles.editor} ${editIsInvalid ? styles.editorInvalid : styles.editorValid} mono`}
+                      value={editText}
+                      onChange={(event) => setEditText(event.target.value)}
+                      data-edit-valid={!editIsInvalid}
+                      spellCheck={false}
+                    />
+                    {editIsInvalid && editValidation?.error && (
+                      <div className={styles.editorError}>
+                        {editValidation.error}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : selectedLine ? (
                 <>
                   <div className={styles.panelHeader}>
                     <div className={styles.tabs}>
@@ -1471,6 +1777,80 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {contextMenu && (
+        <>
+          <div
+            className={styles.contextMenuBackdrop}
+            onClick={() => setContextMenu(null)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              setContextMenu(null);
+            }}
+          />
+          <div
+            className={styles.contextMenu}
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            <button
+              className={styles.contextMenuItem}
+              onClick={() => startEdit(contextMenu.recordId)}
+            >
+              <Pencil size={14} />
+              修改行
+            </button>
+            {activeFile?.format === "jsonl" && (
+              <button
+                className={styles.contextMenuItem}
+                onClick={() => requestDelete(contextMenu.recordId)}
+              >
+                <Trash2 size={14} />
+                删除行
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {confirm && (
+        <div
+          className={styles.confirmOverlay}
+          onClick={() => setConfirm(null)}
+        >
+          <div
+            className={`${styles.confirmCard} ${styles.confirmCardDanger}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.confirmHeader}>
+              <AlertCircle size={20} />
+              <span className={styles.confirmTitle}>
+                {confirm.kind === "overwrite"
+                  ? "确认覆盖原文件"
+                  : "确认删除行"}
+              </span>
+            </div>
+            <p className={styles.confirmText}>
+              {confirm.kind === "overwrite"
+                ? "此操作将覆盖原文件，不可撤销。是否继续？"
+                : "此操作将删除该行，不可撤销。是否继续？"}
+            </p>
+            <div className={styles.confirmActions}>
+              <button
+                className={styles.confirmCancel}
+                onClick={() => setConfirm(null)}
+              >
+                取消
+              </button>
+              <button
+                className={styles.confirmDanger}
+                onClick={confirmAction}
+              >
+                {confirm.kind === "overwrite" ? "覆盖" : "删除"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

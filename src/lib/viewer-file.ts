@@ -18,6 +18,8 @@ export interface ViewerFile {
   isRestorable: boolean;
   isRestored: boolean;
   handle?: FileSystemFileHandle;
+  jsonIsArray?: boolean;
+  isDirty?: boolean;
   lines: ViewerRecord[];
   filter: string;
   sortOrder: ViewerSortOrder;
@@ -94,10 +96,13 @@ function parseJsonlRecords(content: string): ViewerRecord[] {
 export function parseViewerFile(input: ParseViewerFileInput): ViewerFile {
   const format = detectViewerFileFormat(input.name);
   let lines: ViewerRecord[];
+  let jsonIsArray = false;
 
   if (format === "json") {
     try {
-      lines = toJsonRecords(JSON.parse(input.content));
+      const parsed = JSON.parse(input.content);
+      jsonIsArray = Array.isArray(parsed);
+      lines = toJsonRecords(parsed);
     } catch {
       throw new ViewerFileParseError("JSON 文件解析失败");
     }
@@ -115,8 +120,32 @@ export function parseViewerFile(input: ParseViewerFileInput): ViewerFile {
       input.handle !== undefined,
     isRestored: input.source === "restored",
     handle: input.handle,
+    jsonIsArray: format === "json" ? jsonIsArray : undefined,
     lines,
     filter: "",
     sortOrder: "asc",
   };
+}
+
+export function reparseRecord(raw: string): {
+  parsed: unknown | null;
+  error: string | undefined;
+} {
+  try {
+    return { parsed: JSON.parse(raw), error: undefined };
+  } catch (error) {
+    return {
+      parsed: null,
+      error: error instanceof Error ? error.message : "无效 JSON",
+    };
+  }
+}
+
+export function serializeViewerFile(file: ViewerFile): string {
+  if (file.format === "jsonl") {
+    return file.lines.map((line) => line.raw).join("\n");
+  }
+
+  const values = file.lines.map((line) => line.parsed);
+  return JSON.stringify(file.jsonIsArray ? values : (values[0] ?? null), null, 2);
 }
