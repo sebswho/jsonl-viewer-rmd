@@ -118,65 +118,81 @@ function stopProcessTree(pid) {
   });
 }
 
-function ensureBuildExists(workspacePath, pnpmCommand) {
-  const buildIdPath = path.join(workspacePath, ".next", "BUILD_ID");
-  if (fs.existsSync(buildIdPath)) {
-    return;
-  }
+function buildViewer(workspacePath, pnpmCommand) {
+  console.log("Building production bundle with pnpm build...");
+  const completed = spawnSync(
+    process.env.ComSpec ?? "cmd.exe",
+    ["/d", "/c", "call", pnpmCommand, "build"],
+    {
+      cwd: workspacePath,
+      stdio: "inherit",
+      windowsHide: false,
+    },
+  );
 
-  console.log("No production build found. Running pnpm build...");
-  const completed = spawnSync(pnpmCommand, ["build"], {
-    cwd: workspacePath,
-    stdio: "inherit",
-    windowsHide: false,
-  });
+  if (completed.error) {
+    throw new Error(`Unable to start pnpm build: ${completed.error.message}`);
+  }
 
   if (completed.status !== 0) {
     throw new Error(`pnpm build failed with code ${completed.status ?? "unknown"}`);
   }
 }
 
-function waitForPort(port, timeoutMs) {
+function waitForPortState(port, timeoutMs, shouldBeListening) {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
     let settled = false;
-    let retryTimer = null;
 
     const attempt = () => {
-      if (settled) {
-        return;
-      }
-
       const socket = net.createConnection({ host: "127.0.0.1", port });
+      let attemptFinished = false;
 
-      socket.once("connect", () => {
-        settled = true;
-        if (retryTimer) {
-          clearTimeout(retryTimer);
-        }
-        socket.destroy();
-        resolve();
-      });
-
-      socket.once("error", () => {
-        socket.destroy();
-        if (settled) {
+      const handleResult = (isListening) => {
+        if (attemptFinished || settled) {
           return;
         }
+
+        attemptFinished = true;
+        socket.destroy();
+
+        if (isListening === shouldBeListening) {
+          settled = true;
+          resolve();
+          return;
+        }
+
         if (Date.now() - startedAt >= timeoutMs) {
           settled = true;
-          reject(new Error(`Timed out waiting for port ${port} to accept connections`));
+          const expectedState = shouldBeListening
+            ? "accept connections"
+            : "be released";
+          reject(
+            new Error(`Timed out waiting for port ${port} to ${expectedState}`),
+          );
           return;
         }
-        retryTimer = setTimeout(attempt, 300);
-      });
+
+        setTimeout(attempt, 300);
+      };
+
+      socket.once("connect", () => handleResult(true));
+      socket.once("error", () => handleResult(false));
     };
 
     attempt();
   });
 }
 
-function startDetachedServer(workspacePath, pnpmCommand, port) {
+function waitForPortRelease(port, timeoutMs) {
+  return waitForPortState(port, timeoutMs, false);
+}
+
+function waitForPort(port, timeoutMs) {
+  return waitForPortState(port, timeoutMs, true);
+}
+
+function startDetachedServer(workspacePath, port) {
   const runtimePaths = getRuntimePaths(workspacePath, port);
   const startArgs = getManagedStartArgs(workspacePath, port);
   const nextCliPath = startArgs[0];
@@ -222,7 +238,8 @@ function getDefaultDependencies() {
     resolvePnpmCommand,
     getListeningProcess,
     stopProcessTree,
-    ensureBuildExists,
+    waitForPortRelease,
+    buildViewer,
     startDetachedServer,
     waitForPort,
   };
@@ -232,14 +249,15 @@ export async function restartViewerServer(
   {
     workspacePath,
     port = DEFAULT_PORT,
-  } = {},
+  },
   dependencies = {},
 ) {
   const {
     resolvePnpmCommand: resolvePnpm,
     getListeningProcess: getActiveProcess,
     stopProcessTree: stopManagedProcessTree,
-    ensureBuildExists: ensureBuild,
+    waitForPortRelease: waitUntilPortReleased,
+    buildViewer: buildProduction,
     startDetachedServer: startServer,
     waitForPort: waitUntilPortReady,
   } = {
@@ -260,11 +278,12 @@ export async function restartViewerServer(
       `Stopping existing viewer process ${activeProcess.ProcessId ?? activeProcess.processId} on port ${port}...`,
     );
     stopManagedProcessTree(activeProcess.ProcessId ?? activeProcess.processId);
+    await waitUntilPortReleased(port, START_TIMEOUT_MS);
   }
 
-  ensureBuild(workspacePath, pnpmCommand);
+  buildProduction(workspacePath, pnpmCommand);
 
-  const server = startServer(workspacePath, pnpmCommand, port);
+  const server = startServer(workspacePath, port);
   await waitUntilPortReady(port, START_TIMEOUT_MS);
 
   return server;
